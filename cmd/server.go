@@ -17,7 +17,6 @@ type TemplateParam struct {
 	Host    string
 	Reload  bool
 	Mode    string
-	DirMode bool
 }
 
 type IndexTemplateParam struct {
@@ -280,46 +279,11 @@ func (server *Server) ServeDir(param *Param) error {
 
 func dirHandler(baseDir string, param *Param, fileServer http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Index page
+		// Index page — serves the sidebar layout
 		if r.URL.Path == "/" {
 			serveIndex(w, r, baseDir, param)
 			return
 		}
-
-		// Markdown file preview
-		if strings.HasSuffix(r.URL.Path, ".md") {
-			relPath := r.URL.Path[1:] // strip leading /
-			absPath, err := safePath(baseDir, relPath)
-			if err != nil {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			if _, err := os.Stat(absPath); os.IsNotExist(err) {
-				http.NotFound(w, r)
-				return
-			}
-
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			tmpl, err := template.New("HTML Template").Parse(htmlTemplate)
-			if err != nil {
-				logInfo("Warn: %v", err)
-				http.NotFound(w, r)
-				return
-			}
-
-			title := filepath.Base(relPath)
-			modeString := getModeString(param.forceLightMode, param.forceDarkMode)
-			tparam := TemplateParam{
-				Title:   title,
-				Host:    r.Host,
-				Reload:  param.reload,
-				Mode:    modeString,
-				DirMode: true,
-			}
-			tmpl.Execute(w, tparam)
-			return
-		}
-
 		// Static files (images, etc.)
 		fileServer.ServeHTTP(w, r)
 	})

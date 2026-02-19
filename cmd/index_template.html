@@ -18,183 +18,397 @@
     <link rel="stylesheet" href="{{ $cssURL }}" />
     <style>
       {{ if eq .Mode "dark" }}
-      body {
-        background-color: #0d1117;
-        color: #c9d1d9;
+      :root {
+        --bg: #0d1117;
+        --fg: #c9d1d9;
+        --sidebar-bg: #010409;
+        --sidebar-border: #30363d;
+        --sidebar-hover: #161b22;
+        --sidebar-active: #1f2937;
+        --file-link: #58a6ff;
+        --file-dir: #8b949e;
+        --header-bg: #161b22;
+        --header-border: #30363d;
+        --scrollbar-thumb: #30363d;
+        --scrollbar-track: transparent;
       }
       {{ else if eq .Mode "light" }}
+      :root {
+        --bg: #ffffff;
+        --fg: #1f2328;
+        --sidebar-bg: #f6f8fa;
+        --sidebar-border: #d0d7de;
+        --sidebar-hover: #eaeef2;
+        --sidebar-active: #ddf4ff;
+        --file-link: #0969da;
+        --file-dir: #656d76;
+        --header-bg: #f6f8fa;
+        --header-border: #d0d7de;
+        --scrollbar-thumb: #d0d7de;
+        --scrollbar-track: transparent;
+      }
       {{ else }}
+      :root {
+        --bg: #ffffff;
+        --fg: #1f2328;
+        --sidebar-bg: #f6f8fa;
+        --sidebar-border: #d0d7de;
+        --sidebar-hover: #eaeef2;
+        --sidebar-active: #ddf4ff;
+        --file-link: #0969da;
+        --file-dir: #656d76;
+        --header-bg: #f6f8fa;
+        --header-border: #d0d7de;
+        --scrollbar-thumb: #d0d7de;
+        --scrollbar-track: transparent;
+      }
       @media (prefers-color-scheme: dark) {
-        body {
-          background-color: #0d1117;
-          color: #c9d1d9;
+        :root {
+          --bg: #0d1117;
+          --fg: #c9d1d9;
+          --sidebar-bg: #010409;
+          --sidebar-border: #30363d;
+          --sidebar-hover: #161b22;
+          --sidebar-active: #1f2937;
+          --file-link: #58a6ff;
+          --file-dir: #8b949e;
+          --header-bg: #161b22;
+          --header-border: #30363d;
+          --scrollbar-thumb: #30363d;
+          --scrollbar-track: transparent;
         }
       }
       {{ end }}
+
       * {
         box-sizing: border-box;
+        margin: 0;
+        padding: 0;
       }
+
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
         font-size: 14px;
         line-height: 1.5;
-        margin: 0;
-        padding: 0;
+        background-color: var(--bg);
+        color: var(--fg);
+        overflow: hidden;
+        height: 100vh;
       }
-      .container {
-        max-width: 920px;
-        margin: 0 auto;
-        padding: 32px 45px;
+
+      .layout {
+        display: flex;
+        height: 100vh;
       }
-      .page-title {
-        font-size: 20px;
-        font-weight: 600;
-        margin: 0 0 16px 0;
-        color: inherit;
-      }
-      .file-list {
-        border: 1px solid #d0d7de;
-        border-radius: 6px;
+
+      /* ── Sidebar ── */
+      .sidebar {
+        width: 280px;
+        min-width: 280px;
+        border-right: 1px solid var(--sidebar-border);
+        background-color: var(--sidebar-bg);
+        display: flex;
+        flex-direction: column;
         overflow: hidden;
       }
-      .file-list-header {
+
+      .sidebar-header {
+        padding: 16px;
+        border-bottom: 1px solid var(--sidebar-border);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--fg);
         display: flex;
         align-items: center;
-        padding: 10px 16px;
-        background-color: #f6f8fa;
-        border-bottom: 1px solid #d0d7de;
-        font-size: 12px;
-        font-weight: 600;
+        gap: 8px;
+        flex-shrink: 0;
       }
+
+      .sidebar-header svg {
+        flex-shrink: 0;
+      }
+
+      .sidebar-header .dir-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .sidebar-header .file-count {
+        margin-left: auto;
+        font-weight: 400;
+        font-size: 12px;
+        color: var(--file-dir);
+        flex-shrink: 0;
+      }
+
+      .file-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 0;
+      }
+
+      .file-list::-webkit-scrollbar {
+        width: 6px;
+      }
+      .file-list::-webkit-scrollbar-track {
+        background: var(--scrollbar-track);
+      }
+      .file-list::-webkit-scrollbar-thumb {
+        background: var(--scrollbar-thumb);
+        border-radius: 3px;
+      }
+
       .file-item {
         display: flex;
         align-items: center;
-        padding: 8px 16px;
-        border-bottom: 1px solid #d0d7de;
+        padding: 6px 16px;
+        cursor: pointer;
         text-decoration: none;
-        color: inherit;
+        color: var(--file-link);
+        font-size: 13px;
+        border-left: 3px solid transparent;
+        transition: background-color 0.1s;
       }
-      .file-item:last-child {
-        border-bottom: none;
-      }
+
       .file-item:hover {
-        background-color: #f6f8fa;
+        background-color: var(--sidebar-hover);
       }
+
+      .file-item.active {
+        background-color: var(--sidebar-active);
+        border-left-color: var(--file-link);
+        font-weight: 600;
+      }
+
       .file-icon {
         flex-shrink: 0;
         margin-right: 8px;
         width: 16px;
         height: 16px;
+        color: var(--file-dir);
       }
-      .file-name {
-        color: #0969da;
+
+      .file-item .file-dir {
+        color: var(--file-dir);
       }
-      .file-dir {
-        color: #656d76;
-      }
+
       .empty-message {
         padding: 32px 16px;
         text-align: center;
-        color: #656d76;
+        color: var(--file-dir);
       }
-      @media (prefers-color-scheme: dark) {
-        {{ if eq .Mode "" }}
-        .file-list {
-          border-color: #30363d;
-        }
-        .file-list-header {
-          background-color: #161b22;
-          border-bottom-color: #30363d;
-        }
-        .file-item {
-          border-bottom-color: #21262d;
-        }
-        .file-item:hover {
-          background-color: #161b22;
-        }
-        .file-name {
-          color: #58a6ff;
-        }
-        .file-dir {
-          color: #8b949e;
-        }
-        .empty-message {
-          color: #8b949e;
-        }
-        {{ end }}
+
+      /* ── Main content ── */
+      .main {
+        flex: 1;
+        overflow-y: auto;
+        background-color: var(--bg);
       }
-      {{ if eq .Mode "dark" }}
-      .file-list {
-        border-color: #30363d;
+
+      .markdown-body {
+        box-sizing: border-box;
+        min-width: 200px;
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 32px 45px;
       }
-      .file-list-header {
-        background-color: #161b22;
-        border-bottom-color: #30363d;
+
+      .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 200px;
+        color: var(--file-dir);
       }
-      .file-item {
-        border-bottom-color: #21262d;
+
+      .copy-button {
+        background-color: transparent;
+        border: none;
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        border-radius: 5px;
+        padding: 5px;
+        cursor: pointer;
       }
-      .file-item:hover {
-        background-color: #161b22;
+      .copy-button:hover {
+        background-color: var(--sidebar-hover);
       }
-      .file-name {
-        color: #58a6ff;
-      }
-      .file-dir {
-        color: #8b949e;
-      }
-      .empty-message {
-        color: #8b949e;
-      }
-      {{ end }}
+
       @media (max-width: 767px) {
-        .container {
+        .sidebar {
+          width: 220px;
+          min-width: 220px;
+        }
+        .markdown-body {
           padding: 16px;
         }
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1 class="page-title">{{ .Dir }}</h1>
-      {{ if .Files }}
-      <div class="file-list">
-        <div class="file-list-header">
-          <span>{{ len .Files }} markdown file{{ if gt (len .Files) 1 }}s{{ end }}</span>
-        </div>
-        {{ range .Files }}
-        <a href="/{{ .Path }}" class="file-item">
-          <svg class="file-icon" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.062V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z"></path>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+      MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        },
+      }
+    </script>
+    <script
+      type="text/javascript"
+      async
+      src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"
+    ></script>
+    <script
+      type="text/javascript"
+      src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.3.0/mermaid.min.js"
+    ></script>
+
+    <div class="layout">
+      <nav class="sidebar">
+        <div class="sidebar-header">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"></path>
           </svg>
-          {{ if .Dir }}<span class="file-dir">{{ .Dir }}/</span>{{ end }}<span class="file-name">{{ .Name }}</span>
-        </a>
-        {{ end }}
-      </div>
-      {{ else }}
-      <div class="file-list">
-        <div class="empty-message">No markdown files found in this directory.</div>
-      </div>
-      {{ end }}
+          <span class="dir-name">{{ .Dir }}</span>
+          <span class="file-count">{{ len .Files }}</span>
+        </div>
+        <div class="file-list">
+          {{ if .Files }}
+          {{ range .Files }}
+          <a class="file-item" data-path="{{ .Path }}" onclick="loadFile('{{ .Path }}'); return false;" href="#">
+            <svg class="file-icon" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.062V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z"></path>
+            </svg>
+            {{ if .Dir }}<span class="file-dir">{{ .Dir }}/</span>{{ end }}<span>{{ .Name }}</span>
+          </a>
+          {{ end }}
+          {{ else }}
+          <div class="empty-message">No markdown files found.</div>
+          {{ end }}
+        </div>
+      </nav>
+
+      <main class="main">
+        <div class="loading" id="loading">Loading…</div>
+        <article id="markdown-body" class="markdown-body" style="display:none;"></article>
+      </main>
     </div>
+
     <script type="text/javascript">
-      (function () {
+      var currentPath = null;
+
+      const copyIcon = `<svg class="copy-icon" aria-hidden="true" fill="none" height="18" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="18"><path d="M8 17.929H6c-1.105 0-2-.912-2-2.036V5.036C4 3.91 4.895 3 6 3h8c1.105 0 2 .911 2 2.036v1.866m-6 .17h8c1.105 0 2 .91 2 2.035v10.857C20 21.09 19.105 22 18 22h-8c-1.105 0-2-.911-2-2.036V9.107c0-1.124.895-2.036 2-2.036z"></path></svg>`;
+      const tickIcon = `<svg class="tick-icon" aria-hidden="true" fill="none" height="18" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="18"><path d="M5 13l4 4L19 7"></path></svg>`;
+
+      function loadFile(path) {
+        currentPath = path;
+
+        // Update sidebar active state
+        document.querySelectorAll('.file-item').forEach(function(el) {
+          el.classList.toggle('active', el.getAttribute('data-path') === path);
+        });
+
+        // Update title
+        document.title = path + ' — {{ .Dir }}';
+
+        // Show loading
+        document.getElementById('loading').style.display = 'flex';
+        document.getElementById('markdown-body').style.display = 'none';
+
+        $.ajax({
+          url: "/__/md?path=" + encodeURIComponent(path),
+          success: function(result) {
+            var $body = $("#markdown-body");
+            $body.html(result);
+            document.getElementById('loading').style.display = 'none';
+            $body.show();
+
+            // Scroll main to top
+            document.querySelector('.main').scrollTop = 0;
+
+            // MathJax
+            MathJax.typeset();
+
+            // Mermaid
+            {{ if eq .Mode "dark" }}
+            const mermaidJsTheme = 'dark';
+            {{ else if eq .Mode "light" }}
+            const mermaidJsTheme = 'default';
+            {{ else }}
+            const mermaidJsTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default';
+            {{ end }}
+            mermaid.initialize({ startOnLoad: false, theme: mermaidJsTheme });
+
+            $('div.highlight-source-mermaid > pre').each(async function(i, pre) {
+              var originalText = pre.textContent;
+              var id = 'mermaid-diagram-' + i;
+              try {
+                var res = await mermaid.render(id, originalText);
+                $(pre).html(res.svg);
+                $(pre).data('original-text', originalText);
+                var button = $('<button class="copy-button" aria-label="Copy mermaid code to clipboard">' + copyIcon + '</button>');
+                $(pre).css("position", "relative").append(button);
+                button.on('click', function() {
+                  navigator.clipboard.writeText(originalText).then(function() {
+                    button.html(tickIcon);
+                    setTimeout(function() { button.html(copyIcon); }, 1000);
+                  });
+                });
+              } catch(error) {
+                console.error('Mermaid rendering error:', error);
+              }
+            });
+
+            // Copy buttons on code blocks
+            $body.find('pre').each(function() {
+              var pre = $(this);
+              if (pre.closest('div.highlight-source-mermaid').length > 0) return;
+              var code = pre.find('code');
+              var button = $('<button class="copy-button" aria-label="Copy code to clipboard">' + copyIcon + '</button>');
+              pre.css("position", "relative").append(button);
+              button.on('click', function() {
+                var textToCopy = code.length > 0 ? code.text() : pre.text().replace(/Copy.*$/, '').trim();
+                navigator.clipboard.writeText(textToCopy).then(function() {
+                  button.html(tickIcon);
+                  setTimeout(function() { button.html(copyIcon); }, 1000);
+                });
+              });
+            });
+          },
+          error: function() {
+            document.getElementById('loading').style.display = 'none';
+            $("#markdown-body").html('<p style="color: var(--file-dir); text-align: center;">Failed to load file.</p>').show();
+          }
+        });
+      }
+
+      (function() {
+        // WebSocket live reload
         var reload = false;
         {{if .Reload}} reload = true; {{end}}
         if (reload) {
           var conn = new WebSocket("ws://{{.Host}}/ws");
-          conn.onmessage = function (e) {
-            if (e.data === "reload") {
-              location.reload();
+          conn.onopen = function() { conn.send('Ping'); };
+          conn.onerror = function(e) { console.log("Connection error " + e); };
+          conn.onclose = function(e) { console.log("Connection closed " + e); };
+          conn.onmessage = function(e) {
+            if (e.data === "reload" && currentPath) {
+              loadFile(currentPath);
             }
           };
-          conn.onerror = function (e) {
-            console.log("Connection error " + e);
-          };
-          conn.onclose = function (e) {
-            console.log("Connection closed " + e);
-          };
         }
+
+        // Auto-load first file
+        {{ if .Files }}
+        var files = document.querySelectorAll('.file-item');
+        if (files.length > 0) {
+          loadFile(files[0].getAttribute('data-path'));
+        }
+        {{ end }}
       })();
     </script>
   </body>

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -31,41 +32,36 @@ func TestDirHandler_Index(t *testing.T) {
 	}
 }
 
-func TestDirHandler_MdFile(t *testing.T) {
+func TestDirHandler_IndexContainsSidebar(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "test.md"), []byte("# test"), 0644)
+	os.WriteFile(filepath.Join(dir, "README.md"), []byte("# readme"), 0644)
+	os.WriteFile(filepath.Join(dir, "guide.md"), []byte("# guide"), 0644)
 
 	param := &Param{reload: false}
 	h := dirHandler(dir, param, http.FileServer(http.Dir(dir)))
 	ts := httptest.NewServer(h)
 	defer ts.Close()
 
-	res, err := http.Get(ts.URL + "/test.md")
+	res, err := http.Get(ts.URL + "/")
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
-	if res.StatusCode != 200 {
-		t.Errorf("md file status = %d, want 200", res.StatusCode)
-	}
-	if ct := res.Header.Get("Content-Type"); !strings.Contains(ct, "text/html") {
-		t.Errorf("md file content-type = %s, want text/html", ct)
-	}
-}
+	body, _ := io.ReadAll(res.Body)
+	html := string(body)
 
-func TestDirHandler_NotFound(t *testing.T) {
-	dir := t.TempDir()
-
-	param := &Param{reload: false}
-	h := dirHandler(dir, param, http.FileServer(http.Dir(dir)))
-	ts := httptest.NewServer(h)
-	defer ts.Close()
-
-	res, err := http.Get(ts.URL + "/nonexistent.md")
-	if err != nil {
-		t.Fatalf("unexpected: %v", err)
+	// Should contain sidebar elements
+	if !strings.Contains(html, "sidebar") {
+		t.Error("index should contain sidebar class")
 	}
-	if res.StatusCode != 404 {
-		t.Errorf("nonexistent file status = %d, want 404", res.StatusCode)
+	if !strings.Contains(html, "README.md") {
+		t.Error("index should list README.md")
+	}
+	if !strings.Contains(html, "guide.md") {
+		t.Error("index should list guide.md")
+	}
+	// Should contain the markdown-body target for AJAX loading
+	if !strings.Contains(html, "markdown-body") {
+		t.Error("index should contain markdown-body element")
 	}
 }
 
