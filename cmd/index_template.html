@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ .Title }}</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="https://github.githubassets.com/favicons/favicon.svg"
+    />
+    {{ $cssURL :=
+    "https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.6.1/github-markdown.min.css" }} {{
+    if eq .Mode "dark" }} {{ $cssURL =
+    "https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.6.1/github-markdown-dark.min.css"
+    }} {{ else if eq .Mode "light" }} {{ $cssURL =
+    "https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.6.1/github-markdown-light.min.css"
+    }}{{ end }}
+    <link rel="stylesheet" href="{{ $cssURL }}" />
+    <style>
+      {{ if eq .Mode "dark" }}
+      body {
+        background-color: #0d1117;
+        color: #c9d1d9;
+      }
+      {{ else if eq .Mode "light" }}
+      {{ else }}
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: #0d1117;
+          color: #c9d1d9;
+        }
+      }
+      {{ end }}
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 32px 45px;
+      }
+      .page-title {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 16px 0;
+        color: inherit;
+      }
+      .file-list {
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .file-list-header {
+        display: flex;
+        align-items: center;
+        padding: 10px 16px;
+        background-color: #f6f8fa;
+        border-bottom: 1px solid #d0d7de;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .file-item {
+        display: flex;
+        align-items: center;
+        padding: 8px 16px;
+        border-bottom: 1px solid #d0d7de;
+        text-decoration: none;
+        color: inherit;
+      }
+      .file-item:last-child {
+        border-bottom: none;
+      }
+      .file-item:hover {
+        background-color: #f6f8fa;
+      }
+      .file-icon {
+        flex-shrink: 0;
+        margin-right: 8px;
+        width: 16px;
+        height: 16px;
+      }
+      .file-name {
+        color: #0969da;
+      }
+      .file-dir {
+        color: #656d76;
+      }
+      .empty-message {
+        padding: 32px 16px;
+        text-align: center;
+        color: #656d76;
+      }
+      @media (prefers-color-scheme: dark) {
+        {{ if eq .Mode "" }}
+        .file-list {
+          border-color: #30363d;
+        }
+        .file-list-header {
+          background-color: #161b22;
+          border-bottom-color: #30363d;
+        }
+        .file-item {
+          border-bottom-color: #21262d;
+        }
+        .file-item:hover {
+          background-color: #161b22;
+        }
+        .file-name {
+          color: #58a6ff;
+        }
+        .file-dir {
+          color: #8b949e;
+        }
+        .empty-message {
+          color: #8b949e;
+        }
+        {{ end }}
+      }
+      {{ if eq .Mode "dark" }}
+      .file-list {
+        border-color: #30363d;
+      }
+      .file-list-header {
+        background-color: #161b22;
+        border-bottom-color: #30363d;
+      }
+      .file-item {
+        border-bottom-color: #21262d;
+      }
+      .file-item:hover {
+        background-color: #161b22;
+      }
+      .file-name {
+        color: #58a6ff;
+      }
+      .file-dir {
+        color: #8b949e;
+      }
+      .empty-message {
+        color: #8b949e;
+      }
+      {{ end }}
+      @media (max-width: 767px) {
+        .container {
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="page-title">{{ .Dir }}</h1>
+      {{ if .Files }}
+      <div class="file-list">
+        <div class="file-list-header">
+          <span>{{ len .Files }} markdown file{{ if gt (len .Files) 1 }}s{{ end }}</span>
+        </div>
+        {{ range .Files }}
+        <a href="/{{ .Path }}" class="file-item">
+          <svg class="file-icon" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.062V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z"></path>
+          </svg>
+          {{ if .Dir }}<span class="file-dir">{{ .Dir }}/</span>{{ end }}<span class="file-name">{{ .Name }}</span>
+        </a>
+        {{ end }}
+      </div>
+      {{ else }}
+      <div class="file-list">
+        <div class="empty-message">No markdown files found in this directory.</div>
+      </div>
+      {{ end }}
+    </div>
+    <script type="text/javascript">
+      (function () {
+        var reload = false;
+        {{if .Reload}} reload = true; {{end}}
+        if (reload) {
+          var conn = new WebSocket("ws://{{.Host}}/ws");
+          conn.onmessage = function (e) {
+            if (e.data === "reload") {
+              location.reload();
+            }
+          };
+          conn.onerror = function (e) {
+            console.log("Connection error " + e);
+          };
+          conn.onclose = function (e) {
+            console.log("Connection closed " + e);
+          };
+        }
+      })();
+    </script>
+  </body>
+</html>

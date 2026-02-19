@@ -223,6 +223,11 @@
       type="text/javascript"
       src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.3.0/mermaid.min.js"
     ></script>
+    {{ if .DirMode }}
+    <nav style="max-width: 920px; margin: 0 auto; padding: 12px 45px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; font-size: 14px;">
+      <a href="/" style="color: #0969da; text-decoration: none;">&larr; All files</a>
+    </nav>
+    {{ end }}
     <article id="markdown-body" class="markdown-body"></article>
   </body>
 </html>

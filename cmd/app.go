@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strings"
 
 	"github.com/cli/safeexec"
 )
@@ -84,4 +86,63 @@ func gh(args ...string) (sout, eout bytes.Buffer, err error) {
 	}
 
 	return
+}
+
+// findMarkdownFiles recursively finds all .md files in dir,
+// returning paths relative to dir, sorted with README files first.
+func findMarkdownFiles(dir string) ([]string, error) {
+	var files []string
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			// Skip hidden directories (but not the root)
+			if strings.HasPrefix(info.Name(), ".") && path != dir {
+				return filepath.SkipDir
+			}
+			// Skip node_modules, vendor
+			if info.Name() == "node_modules" || info.Name() == "vendor" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(strings.ToLower(info.Name()), ".md") {
+			rel, err := filepath.Rel(dir, path)
+			if err != nil {
+				return err
+			}
+			files = append(files, rel)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		iIsReadme := strings.HasPrefix(strings.ToLower(filepath.Base(files[i])), "readme")
+		jIsReadme := strings.HasPrefix(strings.ToLower(filepath.Base(files[j])), "readme")
+		if iIsReadme != jIsReadme {
+			return iIsReadme
+		}
+		return files[i] < files[j]
+	})
+
+	return files, nil
+}
+
+// safePath validates that relPath doesn't escape baseDir.
+// Returns the absolute path to the file.
+func safePath(baseDir, relPath string) (string, error) {
+	cleaned := filepath.Clean(relPath)
+	if filepath.IsAbs(cleaned) {
+		return "", fmt.Errorf("absolute paths not allowed: %s", relPath)
+	}
+	abs := filepath.Join(baseDir, cleaned)
+	// Ensure result is under baseDir
+	if !strings.HasPrefix(abs+string(filepath.Separator), baseDir+string(filepath.Separator)) {
+		return "", fmt.Errorf("path traversal detected: %s", relPath)
+	}
+	return abs, nil
 }

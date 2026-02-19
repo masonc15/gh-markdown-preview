@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -17,6 +20,33 @@ func createWatcher(dir string) (*fsnotify.Watcher, error) {
 	}
 	logInfo("Watching %s/ for changes", dir)
 	err = watcher.Add(dir)
+	return watcher, err
+}
+
+// createRecursiveWatcher watches dir and all subdirectories for changes.
+func createRecursiveWatcher(dir string) (*fsnotify.Watcher, error) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return watcher, err
+	}
+
+	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if strings.HasPrefix(info.Name(), ".") && path != dir {
+				return filepath.SkipDir
+			}
+			if info.Name() == "node_modules" || info.Name() == "vendor" {
+				return filepath.SkipDir
+			}
+			logInfo("Watching %s/ for changes", path)
+			return watcher.Add(path)
+		}
+		return nil
+	})
+
 	return watcher, err
 }
 
