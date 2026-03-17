@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -109,5 +110,54 @@ func TestSafePath(t *testing.T) {
 		if err == nil {
 			t.Errorf("safePath(%q, %q) should have failed", baseDir, relPath)
 		}
+	}
+}
+
+
+func TestToHTMLLocal(t *testing.T) {
+	html, err := toHTMLLocal("# Hello\n\nA paragraph with **bold** text.")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(html, "<h1>Hello</h1>") {
+		t.Errorf("expected <h1>Hello</h1>, got: %s", html)
+	}
+	if !strings.Contains(html, "<strong>bold</strong>") {
+		t.Errorf("expected <strong>bold</strong>, got: %s", html)
+	}
+}
+
+func TestToHTMLLocalGFM(t *testing.T) {
+	// GFM table
+	md := "| A | B |\n|---|---|\n| 1 | 2 |"
+	html, err := toHTMLLocal(md)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(html, "<table>") {
+		t.Errorf("expected GFM table, got: %s", html)
+	}
+
+	// GFM task list
+	md = "- [x] done\n- [ ] todo"
+	html, err = toHTMLLocal(md)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(html, "checked") {
+		t.Errorf("expected checked checkbox, got: %s", html)
+	}
+}
+
+func TestToHTMLFallsBackForLargeInput(t *testing.T) {
+	// Create input larger than maxAPISize
+	large := strings.Repeat("hello ", maxAPISize/6+1)
+	md := "# Big\n\n" + large
+	html, err := toHTML(md, &Param{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(html, "<h1>Big</h1>") {
+		t.Errorf("expected <h1>Big</h1>, got first 200 chars: %s", html[:200])
 	}
 }

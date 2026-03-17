@@ -12,6 +12,9 @@ import (
 	"strings"
 
 	"github.com/cli/safeexec"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	gmhtml "github.com/yuin/goldmark/renderer/html"
 )
 
 func targetFile(filename string) (string, error) {
@@ -45,7 +48,23 @@ func findReadme(dir string) (string, error) {
 	return "", err
 }
 
+// maxAPISize is the GitHub Markdown API limit (400 KB).
+const maxAPISize = 400 * 1024
+
 func toHTML(markdown string, param *Param) (string, error) {
+	if len(markdown) > maxAPISize {
+		logInfo("File exceeds GitHub API limit (%d bytes > %d), rendering locally", len(markdown), maxAPISize)
+		return toHTMLLocal(markdown)
+	}
+	html, err := toHTMLRemote(markdown, param)
+	if err != nil {
+		logInfo("GitHub API failed, falling back to local rendering: %v", err)
+		return toHTMLLocal(markdown)
+	}
+	return html, nil
+}
+
+func toHTMLRemote(markdown string, param *Param) (string, error) {
 	mode := "gfm"
 	if param.markdownMode {
 		mode = "markdown"
@@ -55,6 +74,20 @@ func toHTML(markdown string, param *Param) (string, error) {
 		return "", err
 	}
 	return sout.String(), nil
+}
+
+func toHTMLLocal(markdown string) (string, error) {
+	md := goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithRendererOptions(
+			gmhtml.WithUnsafe(),
+		),
+	)
+	var buf bytes.Buffer
+	if err := md.Convert([]byte(markdown), &buf); err != nil {
+		return "", fmt.Errorf("local markdown rendering failed: %w", err)
+	}
+	return buf.String(), nil
 }
 
 func slurp(fileName string) (string, error) {
