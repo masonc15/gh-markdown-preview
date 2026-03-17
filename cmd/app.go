@@ -90,6 +90,63 @@ func toHTMLLocal(markdown string) (string, error) {
 	return buf.String(), nil
 }
 
+// MarkdownSection holds metadata for one H1-delimited section.
+type MarkdownSection struct {
+	Title      string `json:"title"`
+	Index      int    `json:"index"`
+	EntryCount int    `json:"entries"`
+}
+
+// splitMarkdownSections splits markdown text at H1 headings.
+// Each returned string starts with its "# " line and includes
+// everything up to (but not including) the next H1.
+func splitMarkdownSections(markdown string) []string {
+	lines := strings.Split(markdown, "\n")
+	var sections []string
+	var current strings.Builder
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "# ") && current.Len() > 0 {
+			sections = append(sections, current.String())
+			current.Reset()
+		}
+		current.WriteString(line)
+		current.WriteString("\n")
+	}
+	if current.Len() > 0 {
+		sections = append(sections, current.String())
+	}
+
+	return sections
+}
+
+// parseSectionsMeta extracts title and H2 entry count from each section.
+func parseSectionsMeta(sections []string) []MarkdownSection {
+	meta := make([]MarkdownSection, len(sections))
+	for i, s := range sections {
+		lines := strings.Split(s, "\n")
+		title := ""
+		entries := 0
+		for _, line := range lines {
+			if strings.HasPrefix(line, "# ") && title == "" {
+				title = strings.TrimPrefix(line, "# ")
+				title = strings.TrimSpace(title)
+			} else if strings.HasPrefix(line, "## ") {
+				entries++
+			}
+		}
+		if title == "" {
+			title = fmt.Sprintf("Section %d", i+1)
+		}
+		meta[i] = MarkdownSection{
+			Title:      title,
+			Index:      i,
+			EntryCount: entries,
+		}
+	}
+	return meta
+}
+
 func slurp(fileName string) (string, error) {
 	f, err := os.Open(fileName)
 	if err != nil {

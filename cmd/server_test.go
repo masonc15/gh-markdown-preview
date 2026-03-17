@@ -14,7 +14,7 @@ func TestHandler(t *testing.T) {
 	param := &Param{
 		reload: false,
 	}
-	ts := httptest.NewServer(handler(filename, param, http.FileServer(http.Dir(dir))))
+	ts := httptest.NewServer(handler(filename, param, false, http.FileServer(http.Dir(dir))))
 	defer ts.Close()
 
 	res, err := http.Get(ts.URL)

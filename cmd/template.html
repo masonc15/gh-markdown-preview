@@ -87,6 +87,54 @@
           padding: 15px;
         }
       }
+      /* Accordion styles for large files */
+      .section-accordion { border-bottom: 1px solid #d0d7de; }
+      .section-header {
+        display: flex; align-items: center; padding: 10px 0;
+        cursor: pointer; user-select: none; gap: 8px;
+      }
+      .section-header:hover { opacity: 0.8; }
+      .section-arrow { font-size: 10px; width: 16px; text-align: center; flex-shrink: 0; }
+      .section-title { font-weight: 600; font-size: 16px; }
+      .entry-count { color: #656d76; font-size: 13px; font-weight: 400; }
+      .section-body { padding: 0 0 16px 24px; display: none; }
+      .toc-toolbar {
+        display: flex; gap: 12px; align-items: center;
+        margin-bottom: 16px; flex-wrap: wrap;
+      }
+      .toc-toolbar button {
+        background: none; border: 1px solid #d0d7de; border-radius: 6px;
+        padding: 4px 12px; cursor: pointer; font-size: 12px; color: inherit;
+      }
+      .toc-toolbar button:hover { background: #f6f8fa; }
+      .toc-search {
+        flex: 1; min-width: 200px; padding: 6px 12px;
+        border: 1px solid #d0d7de; border-radius: 6px;
+        font-size: 13px; background: transparent; color: inherit;
+        outline: none;
+      }
+      .toc-search:focus { border-color: #0969da; box-shadow: 0 0 0 3px rgba(9,105,218,0.15); }
+      .toc-stats { color: #656d76; font-size: 13px; }
+      @media (prefers-color-scheme: dark) {
+        {{ if eq .Mode "" }}
+        .section-accordion { border-bottom-color: #30363d; }
+        .entry-count { color: #8b949e; }
+        .toc-toolbar button { border-color: #30363d; color: #c9d1d9; }
+        .toc-toolbar button:hover { background: #161b22; }
+        .toc-search { border-color: #30363d; color: #c9d1d9; }
+        .toc-search:focus { border-color: #58a6ff; box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
+        .toc-stats { color: #8b949e; }
+        {{ end }}
+      }
+      {{ if eq .Mode "dark" }}
+      .section-accordion { border-bottom-color: #30363d; }
+      .entry-count { color: #8b949e; }
+      .toc-toolbar button { border-color: #30363d; color: #c9d1d9; }
+      .toc-toolbar button:hover { background: #161b22; }
+      .toc-search { border-color: #30363d; color: #c9d1d9; }
+      .toc-search:focus { border-color: #58a6ff; box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
+      .toc-stats { color: #8b949e; }
+      {{ end }}
     </style>
   </head>
   <body>
@@ -115,110 +163,167 @@
       src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"
     ></script>
     <script type="text/javascript">
+      var _path = window.location.pathname.slice(1);
+      const copyIcon = `<svg class="copy-icon" aria-hidden="true" fill="none" height="18" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="18"><path d="M8 17.929H6c-1.105 0-2-.912-2-2.036V5.036C4 3.91 4.895 3 6 3h8c1.105 0 2 .911 2 2.036v1.866m-6 .17h8c1.105 0 2 .91 2 2.035v10.857C20 21.09 19.105 22 18 22h-8c-1.105 0-2-.911-2-2.036V9.107c0-1.124.895-2.036 2-2.036z"></path></svg>`;
+      const tickIcon = `<svg class="tick-icon" aria-hidden="true" fill="none" height="18" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="18"><path d="M5 13l4 4L19 7"></path></svg>`;
+
+      {{ if eq .Mode "dark" }}
+        const _mermaidTheme = 'dark';
+      {{ else if eq .Mode "light" }}
+        const _mermaidTheme = 'default';
+      {{ else }}
+        const _mermaidTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default';
+      {{ end }}
+
+      // Process mermaid, copy buttons, mathjax within a container
+      function processContent($container) {
+        try { MathJax.typeset(); } catch(e) {}
+        try {
+          mermaid.initialize({ startOnLoad: false, theme: _mermaidTheme });
+          $container.find('div.highlight-source-mermaid > pre').each(async function(i, pre) {
+            var text = pre.textContent;
+            var id = 'mermaid-' + Date.now() + '-' + i;
+            try {
+              var result = await mermaid.render(id, text);
+              $(pre).html(result.svg);
+              $(pre).data('original-text', text);
+              var btn = $(`<button class="copy-button" aria-label="Copy mermaid code">${copyIcon}</button>`);
+              $(pre).css('position','relative').append(btn);
+              btn.on('click', function() {
+                navigator.clipboard.writeText(text).then(function() {
+                  btn.html(tickIcon); setTimeout(()=>btn.html(copyIcon), 1000);
+                });
+              });
+            } catch(e) { console.error('Mermaid error:', e); }
+          });
+        } catch(e) {}
+        $container.find('pre').each(function() {
+          var pre = $(this);
+          if (pre.closest('div.highlight-source-mermaid').length > 0) return;
+          var code = pre.find('code');
+          var btn = $(`<button class="copy-button" aria-label="Copy code">${copyIcon}</button>`);
+          pre.css('position','relative').append(btn);
+          btn.on('click', function() {
+            var t = code.length > 0 ? code.text() : pre.text().replace(/Copy.*$/,'').trim();
+            navigator.clipboard.writeText(t).then(function() {
+              btn.html(tickIcon); setTimeout(()=>btn.html(copyIcon), 1000);
+            });
+          });
+        });
+      }
+
+      {{ if .LargeFile }}
+      // --- Large file mode: accordion with lazy-loaded sections ---
+      var _sections = [];
+      var _loaded = {};
+
+      function loadmd() {
+        $.getJSON('/__/md/toc?path=' + encodeURIComponent(_path), function(data) {
+          _sections = data;
+          renderToc(data);
+          if (data.length > 0) toggleSection(0);
+        });
+      }
+
+      function renderToc(sections) {
+        var totalEntries = sections.reduce(function(s,x){return s+x.entries},0);
+        var h = '<div class="toc-toolbar">' +
+          '<input class="toc-search" placeholder="Filter sections..." oninput="filterSections(this.value)">' +
+          '<button onclick="expandAll()">Expand all</button>' +
+          '<button onclick="collapseAll()">Collapse all</button>' +
+          '<span class="toc-stats">' + sections.length + ' sections, ' + totalEntries + ' entries</span>' +
+          '</div>';
+        for (var i = 0; i < sections.length; i++) {
+          var s = sections[i];
+          var entryLabel = s.entries > 0 ? ' <span class="entry-count">(' + s.entries + ')</span>' : '';
+          h += '<div class="section-accordion" data-title="' + s.title.toLowerCase().replace(/"/g,'') + '">' +
+            '<div class="section-header" data-index="' + i + '">' +
+            '<span class="section-arrow">&#9654;</span>' +
+            '<span class="section-title">' + $('<span>').text(s.title).html() + '</span>' +
+            entryLabel + '</div>' +
+            '<div class="section-body" id="sec-' + i + '"></div></div>';
+        }
+        $('#markdown-body').html(h);
+        $('.section-header').on('click', function() { toggleSection($(this).data('index')); });
+      }
+
+      function toggleSection(idx) {
+        var $body = $('#sec-' + idx);
+        var $arrow = $body.prev('.section-header').find('.section-arrow');
+        if ($body.is(':visible')) {
+          $body.slideUp(150); $arrow.html('&#9654;');
+          return;
+        }
+        $arrow.html('&#9660;');
+        if (_loaded[idx]) { $body.slideDown(150); return; }
+        $body.html('<em style="color:#656d76">Loading...</em>').slideDown(150);
+        $.ajax({
+          url: '/__/md/section?path=' + encodeURIComponent(_path) + '&index=' + idx,
+          success: function(result) {
+            $body.html(result);
+            _loaded[idx] = true;
+            processContent($body);
+          }
+        });
+      }
+
+      function filterSections(q) {
+        q = q.toLowerCase();
+        $('.section-accordion').each(function() {
+          $(this).toggle($(this).data('title').indexOf(q) !== -1);
+        });
+      }
+      function expandAll() {
+        $('.section-accordion:visible').each(function() {
+          var idx = $(this).find('.section-header').data('index');
+          var $body = $('#sec-' + idx);
+          if (!$body.is(':visible')) toggleSection(idx);
+        });
+      }
+      function collapseAll() {
+        $('.section-body:visible').each(function() {
+          var idx = parseInt(this.id.replace('sec-',''));
+          toggleSection(idx);
+        });
+      }
+
+      {{ else }}
+      // --- Normal mode: load all content at once ---
       function loadmd() {
         $.ajax({
-          url: "/__/md?path=" + window.location.pathname.slice(1),
+          url: '/__/md?path=' + _path,
           success: function (result) {
-            $("#markdown-body").html(result).promise().done(function(){
-              var count = $("#markdown-body a").length;
-              $("#markdown-body a").each(function(i){
-              var a = $(this);
-              if (a.attr("id") != undefined ) {
-                var id = a.attr("id").replace("user-content-", "");
-                a.attr("id", id);
-              }
-              if (i+1 === count) {
-                if(location.hash) {
+            $('#markdown-body').html(result).promise().done(function(){
+              var count = $('#markdown-body a').length;
+              $('#markdown-body a').each(function(i){
+                var a = $(this);
+                if (a.attr('id') != undefined) {
+                  a.attr('id', a.attr('id').replace('user-content-', ''));
+                }
+                if (i+1 === count && location.hash) {
                   var url = location.href;
                   location.href = location.hash;
                   history.replaceState(null,null,url);
                 }
-              }
-              MathJax.typeset();
-            });
-            {{ if eq .Mode "dark" }}
-              const mermaidJsTheme = 'dark';
-            {{ else if eq .Mode "light" }}
-              const mermaidJsTheme = 'default';
-            {{ else }}
-              const mermaidJsTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default';
-            {{ end }}
-            mermaid.initialize({ startOnLoad: false, theme: mermaidJsTheme });
-
-            $('div.highlight-source-mermaid > pre').each(async function(i, pre) {
-              const originalText = pre.textContent;
-              const id = 'mermaid-diagram-' + i;
-              try {
-                const { svg } = await mermaid.render(id, originalText);
-                $(pre).html(svg);
-                // Store original text for copy functionality
-                $(pre).data('original-text', originalText);
-                // Add copy button after rendering
-                const button = $(`<button class="copy-button" aria-label="Copy mermaid code to clipboard">${copyIcon}</button>`);
-                $(pre).css("position", "relative").append(button);
-                button.on('click', function () {
-                  navigator.clipboard.writeText(originalText).then(function () {
-                    button.html(tickIcon);
-                    setTimeout(() => {
-                      button.html(copyIcon)
-                    }, 1000);
-                  }, function () {
-                    alert('Failed to copy');
-                  });
-                });
-              } catch (error) {
-                console.error('Mermaid rendering error:', error);
-                $(pre).html('<div style="color: red;">Error rendering diagram</div>');
-              }
-            });
-              const copyIcon= `<svg class="copy-icon" aria-hidden="true" fill="none" height="18" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="18" style="color:"currentColor";"><path d="M8 17.929H6c-1.105 0-2-.912-2-2.036V5.036C4 3.91 4.895 3 6 3h8c1.105 0 2 .911 2 2.036v1.866m-6 .17h8c1.105 0 2 .91 2 2.035v10.857C20 21.09 19.105 22 18 22h-8c-1.105 0-2-.911-2-2.036V9.107c0-1.124.895-2.036 2-2.036z"></path></svg>`;
-              const tickIcon = `<svg class="tick-icon" aria-hidden="true" fill="none" height="18" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="18" style="color: "currentColor";"><path d="M5 13l4 4L19 7"></path></svg>`;
-              $('.markdown-body pre').each(function () {
-                const pre = $(this);
-                // Skip if this is a Mermaid diagram (already has copy button)
-                if ($(pre).closest('div.highlight-source-mermaid').length > 0) {
-                  return;
-                }
-                const code = pre.find('code');
-                const button = $(`<button class="copy-button" aria-label="Copy code to clipboard">${copyIcon}</button>`);
-                pre.css("position", "relative");
-                pre.append(button);
-                button.on('click', function () {
-                  // Get text from code element if it exists, otherwise from pre element directly
-                  const textToCopy = code.length > 0 ? code.text() : pre.text().replace(/Copy.*$/, '').trim();
-                  navigator.clipboard.writeText(textToCopy).then(function () {
-                    button.html(tickIcon);
-                    setTimeout(() => {
-                      button.html(copyIcon)
-                    }, 1000);
-                  }, function () {
-                    alert('Failed to copy');
-                  });
-                });
               });
-          })}
-        })
-      };
+              processContent($('#markdown-body'));
+            });
+          }
+        });
+      }
+      {{ end }}
+
       (function () {
-        var reload = false
-        {{if .Reload}} reload = true {{end}}
+        var reload = false;
+        {{if .Reload}} reload = true; {{end}}
         if (reload) {
-          var conn = new WebSocket("ws://{{.Host}}/ws")
-          conn.onopen = function () {
-              conn.send('Ping');
+          var conn = new WebSocket('ws://{{.Host}}/ws');
+          conn.onopen = function() { conn.send('Ping'); };
+          conn.onerror = function(e) { console.log('Connection error ' + e); };
+          conn.onclose = function(e) { console.log('Connection closed ' + e); };
+          conn.onmessage = function(e) {
+            if (e.data === 'reload') { _loaded = {}; loadmd(); }
           };
-          conn.onerror = function (e) {
-            console.log("Connection error " + e);
-          };
-          conn.onclose = function (e) {
-            console.log("Connection closed " + e)
-          }
-          conn.onmessage = function (e) {
-            if (e.data === "reload") {
-              console.log("reload page!");
-              loadmd();
-            }
-          }
         }
         loadmd();
       })()

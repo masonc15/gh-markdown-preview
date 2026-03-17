@@ -2,21 +2,25 @@ package cmd
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 )
 
 type TemplateParam struct {
-	Title   string
-	Body    string
-	Host    string
-	Reload  bool
-	Mode    string
+	Title     string
+	Body      string
+	Host      string
+	Reload    bool
+	Mode      string
+	DirMode   bool
+	LargeFile bool
 }
 
 type IndexTemplateParam struct {
@@ -79,9 +83,19 @@ func (server *Server) Serve(param *Param) error {
 
 	dir := filepath.Dir(filename)
 
+	// Detect large file for sectioned rendering
+	largeFile := false
+	if !param.useStdin {
+		if info, statErr := os.Stat(filename); statErr == nil && info.Size() > maxAPISize {
+			largeFile = true
+		}
+	}
+
 	r := http.NewServeMux()
-	r.Handle("/", wrapHandler(handler(filename, param, http.FileServer(http.Dir(dir)))))
+	r.Handle("/", wrapHandler(handler(filename, param, largeFile, http.FileServer(http.Dir(dir)))))
 	r.Handle("/__/md", wrapHandler(mdHandler(filename, param)))
+	r.Handle("/__/md/toc", wrapHandler(tocHandler(filename, param)))
+	r.Handle("/__/md/section", wrapHandler(sectionHandler(filename, param)))
 
 	watcher, err := createWatcher(dir)
 	if err != nil {
@@ -111,7 +125,7 @@ func (server *Server) Serve(param *Param) error {
 	return nil
 }
 
-func handler(filename string, param *Param, h http.Handler) http.Handler {
+func handler(filename string, param *Param, largeFile bool, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if !strings.HasSuffix(r.URL.Path, ".md") && r.URL.Path != "/" {
@@ -128,27 +142,16 @@ func handler(filename string, param *Param, h http.Handler) http.Handler {
 			return
 		}
 
-		var markdown string
-		if param.useStdin && param.stdinContent != "" && filename == "" {
-			markdown = param.stdinContent
-		} else {
-			markdown, err = slurp(filename)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-
-		html, err := toHTML(markdown, param)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
 		title := getTitle(filename)
 		modeString := getModeString(param.forceLightMode, param.forceDarkMode)
 
-		tparam := TemplateParam{Title: title, Body: html, Host: r.Host, Reload: param.reload, Mode: modeString}
+		tparam := TemplateParam{
+			Title:     title,
+			Host:      r.Host,
+			Reload:    param.reload,
+			Mode:      modeString,
+			LargeFile: largeFile,
+		}
 		tmpl.Execute(w, tparam)
 	})
 }
@@ -247,6 +250,8 @@ func (server *Server) ServeDir(param *Param) error {
 	r := http.NewServeMux()
 	r.Handle("/", wrapHandler(dirHandler(baseDir, param, http.FileServer(http.Dir(baseDir)))))
 	r.Handle("/__/md", wrapHandler(dirMdHandler(baseDir, param)))
+	r.Handle("/__/md/toc", wrapHandler(dirTocHandler(baseDir, param)))
+	r.Handle("/__/md/section", wrapHandler(dirSectionHandler(baseDir, param)))
 
 	watcher, err := createRecursiveWatcher(baseDir)
 	if err != nil {
@@ -279,11 +284,50 @@ func (server *Server) ServeDir(param *Param) error {
 
 func dirHandler(baseDir string, param *Param, fileServer http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Index page — serves the sidebar layout
+		// Index page
 		if r.URL.Path == "/" {
 			serveIndex(w, r, baseDir, param)
 			return
 		}
+
+		// Markdown file preview
+		if strings.HasSuffix(r.URL.Path, ".md") {
+			relPath := r.URL.Path[1:] // strip leading /
+			absPath, err := safePath(baseDir, relPath)
+			if err != nil {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			info, err := os.Stat(absPath)
+			if os.IsNotExist(err) {
+				http.NotFound(w, r)
+				return
+			}
+
+			largeFile := err == nil && info.Size() > maxAPISize
+
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			tmpl, err := template.New("HTML Template").Parse(htmlTemplate)
+			if err != nil {
+				logInfo("Warn: %v", err)
+				http.NotFound(w, r)
+				return
+			}
+
+			title := filepath.Base(relPath)
+			modeString := getModeString(param.forceLightMode, param.forceDarkMode)
+			tparam := TemplateParam{
+				Title:     title,
+				Host:      r.Host,
+				Reload:    param.reload,
+				Mode:      modeString,
+				DirMode:   true,
+				LargeFile: largeFile,
+			}
+			tmpl.Execute(w, tparam)
+			return
+		}
+
 		// Static files (images, etc.)
 		fileServer.ServeHTTP(w, r)
 	})
@@ -347,5 +391,119 @@ func dirMdHandler(baseDir string, param *Param) http.Handler {
 		}
 
 		mdResponse(w, absPath, param)
+	})
+}
+
+// resolveFileFromRequest returns defaultFile or the ?path= query param.
+func resolveFileFromRequest(defaultFile string, r *http.Request) string {
+	if p := r.URL.Query().Get("path"); p != "" {
+		return p
+	}
+	return defaultFile
+}
+
+func tocHandler(defaultFile string, param *Param) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		filename := resolveFileFromRequest(defaultFile, r)
+		markdown, err := slurp(filename)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sections := splitMarkdownSections(markdown)
+		meta := parseSectionsMeta(sections)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(meta)
+	})
+}
+
+func sectionHandler(defaultFile string, param *Param) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		filename := resolveFileFromRequest(defaultFile, r)
+		indexStr := r.URL.Query().Get("index")
+		index, err := strconv.Atoi(indexStr)
+		if err != nil {
+			http.Error(w, "invalid index parameter", http.StatusBadRequest)
+			return
+		}
+		markdown, err := slurp(filename)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sections := splitMarkdownSections(markdown)
+		if index < 0 || index >= len(sections) {
+			http.Error(w, "section not found", http.StatusNotFound)
+			return
+		}
+		html, err := toHTMLLocal(sections[index])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, html)
+	})
+}
+
+func dirTocHandler(baseDir string, param *Param) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pathParam := r.URL.Query().Get("path")
+		if pathParam == "" {
+			http.Error(w, "path parameter required", http.StatusBadRequest)
+			return
+		}
+		absPath, err := safePath(baseDir, pathParam)
+		if err != nil {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		markdown, err := slurp(absPath)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sections := splitMarkdownSections(markdown)
+		meta := parseSectionsMeta(sections)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(meta)
+	})
+}
+
+func dirSectionHandler(baseDir string, param *Param) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pathParam := r.URL.Query().Get("path")
+		if pathParam == "" {
+			http.Error(w, "path parameter required", http.StatusBadRequest)
+			return
+		}
+		absPath, err := safePath(baseDir, pathParam)
+		if err != nil {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		indexStr := r.URL.Query().Get("index")
+		index, err := strconv.Atoi(indexStr)
+		if err != nil {
+			http.Error(w, "invalid index parameter", http.StatusBadRequest)
+			return
+		}
+		markdown, err := slurp(absPath)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sections := splitMarkdownSections(markdown)
+		if index < 0 || index >= len(sections) {
+			http.Error(w, "section not found", http.StatusNotFound)
+			return
+		}
+		html, err := toHTMLLocal(sections[index])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, html)
 	})
 }
